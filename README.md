@@ -5,6 +5,8 @@ A cool example of a least squares system for `pose-landmark`, `pose-landmark-pro
 Run octave GUI (in order to manipulate the generated windows easily)
 
     octave
+    
+Now also MATLAB compliant :)
 
 **From the octave GUI command line** run:
 
