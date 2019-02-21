@@ -105,7 +105,7 @@ for (iteration=1:num_iterations)
   H=zeros(system_size, system_size);
   b=zeros(system_size,1);
 
-  [H_poses, b_poses] = initializePoses(XR, Zr, pose_associations,num_poses);
+  [H_poses, b_poses] = initializePosesChordal(XR, Zr, pose_associations,num_poses);
 
   H=H_poses;
   b=b_poses;
@@ -134,20 +134,20 @@ figure(1);
 hold on;
 grid;
 
-subplot(2,2,3);
+subplot(1,2,1);
 title("Poses Initial Guess");
 plot3(XR_true(1,:),XR_true(2,:),XR_true(3,:),'b*',"linewidth",2);
 hold on;
 plot3(XR_guess(1,:),XR_guess(2,:),XR_guess(3,:),'ro',"linewidth",2);
-legend("Poses True", "Guess");grid;
+legend("Poses True", "Guess");grid; axis equal
 
 
-subplot(2,2,4);
+subplot(1,2,2);
 title("Poses After Optimization");
 plot3(XR_true(1,:),XR_true(2,:),XR_true(3,:),'b*',"linewidth",2);
 hold on;
 plot3(XR(1,:),XR(2,:),XR(3,:),'ro',"linewidth",2);
-legend("Poses True", "Guess"); grid;
+legend("Poses True", "Guess"); grid;axis equal
 
 %
 % figure(2);

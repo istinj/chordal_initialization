@@ -162,7 +162,8 @@ title("Landmark Initial Guess");
 plot3(XL_true(1,:),XL_true(2,:),XL_true(3,:),'b*',"linewidth",2);
 hold on;
 plot3(XL_guess(1,:),XL_guess(2,:),XL_guess(3,:),'ro',"linewidth",2);
-legend("Landmark True", "Guess");grid;
+legend("Landmark True", "Guess");grid; axis square
+
 
 
 subplot(2,2,2);
@@ -170,7 +171,7 @@ title("Landmark After Optimization");
 plot3(XL_true(1,:),XL_true(2,:),XL_true(3,:),'b*',"linewidth",2);
 hold on;
 plot3(XL(1,:),XL(2,:),XL(3,:),'ro',"linewidth",2);
-legend("Landmark True", "Guess");grid;
+legend("Landmark True", "Guess");grid;axis square
 
 
 subplot(2,2,3);
@@ -178,7 +179,7 @@ title("Poses Initial Guess");
 plot3(XR_true(1,:),XR_true(2,:),XR_true(3,:),'b*',"linewidth",2);
 hold on;
 plot3(XR_guess(1,:),XR_guess(2,:),XR_guess(3,:),'ro',"linewidth",2);
-legend("Poses True", "Guess");grid;
+legend("Poses True", "Guess");grid;axis square
 
 
 subplot(2,2,4);
@@ -186,7 +187,7 @@ title("Poses After Optimization");
 plot3(XR_true(1,:),XR_true(2,:),XR_true(3,:),'b*',"linewidth",2);
 hold on;
 plot3(XR(1,:),XR(2,:),XR(3,:),'ro',"linewidth",2);
-legend("Poses True", "Guess"); grid;
+legend("Poses True", "Guess"); grid;axis square
 
 
 figure(2);
