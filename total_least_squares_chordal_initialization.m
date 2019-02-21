@@ -28,7 +28,9 @@ function M=mprod(v)
   M(1:3,1:3)=R';
   M(4:6,4:6)=R';
   M(7:9,7:9)=R'; % R' on the diagonal blocks
-  M(10,1:3)=M(11,4:6)=M(12,7:9)=t';    % t' on the three rows of lower part
+  M(10,1:3)=t';
+  M(11,4:6)=t';
+  M(12,7:9)=t'; % t' on the three rows of lower part
 end
 
 

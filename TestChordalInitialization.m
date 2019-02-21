@@ -5,6 +5,9 @@ clc;
 % This is an integrated example that comprises
 %
 addpath("./tools");
+addpath("./tools/utilities");
+addpath("./tools/visualization");
+addpath("./tools/g2o_wrapper");
 total_least_squares
 total_least_squares_chordal_initialization
 
