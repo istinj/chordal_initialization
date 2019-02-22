@@ -3,6 +3,7 @@ clear;
 clc;
 
 chordal_dimension = 12;
+zero_guess = 0
 
 Factor = struct("id",-1,"pose",eye(chordal_dimension,chordal_dimension),"ass",[-1;-1],...
   "hii_idx_start",-1,"hii_idx_end",-1,...
@@ -21,9 +22,7 @@ color_green = [.1 .9 .1];
 
 %ia ground truth generation
 num_poses = 200;
-marker_size = 48;
-marker_size = repmat(marker_size, [1 1 num_poses]);
-world_size = 10;
+world_size = 50;
 Xr_gt = zeros(4,4,num_poses);
 Xr_gt(:,:,1) = eye(4,4); %ia first pose is in the origin
 
@@ -54,10 +53,20 @@ for m=1:num_meas
   factors{m}.hjj_idx_end = chordalMatrixIndex(m+1, num_poses)+chordal_dimension-1;
 end
 
-%ia generate wrong initial guess (all zero);
+%ia generate a wrong initial guess
 Xr_guess = zeros(4,4,num_poses);
-for p=1:num_poses
-  Xr_guess(:,:,p) = eye(4,4);
+Xr_guess(:,:,1) = Xr_gt(:,:,1); %ia fix the first pose
+pert_deviation=1;
+pert_scale=eye(6)*pert_deviation;
+for p=2:num_poses
+  if zero_guess
+    %ia zero guess;
+    Xr_guess(:,:,p) = eye(4,4);
+  else
+    %ia random guess
+    xr=rand(6,1)-0.5;
+    Xr_guess(:,:,p) = v2t(pert_scale*xr)*Xr_gt(:,:,p); 
+  end
 end
 
 %ia start doing things
@@ -147,7 +156,7 @@ end
 figure("Name","Chordal Initialization Dioporco");
 subplot(1,2,1);
 title("Ground Truth and Initial Guess");
-hold on; grid;
+hold on; grid; axis([-world_size*0.5, world_size*0.5,-world_size*0.5, world_size*0.5]);
 px = Xr_gt(1,4,:);
 py = Xr_gt(2,4,:);
 pz = Xr_gt(3,4,:);
@@ -157,13 +166,12 @@ py = Xr_guess(2,4,:);
 pz = Xr_guess(3,4,:);
 scatter3(px,py,pz,'*','MarkerFaceColor',color_red);
 legend("GT", "Guess");
-axis equal;
 hold off;
 
 %ia show the updated world
 subplot(1,2,2);
 title("Ground Truth and Initialization");
-hold on; grid;
+hold on; grid; axis([-world_size*0.5, world_size*0.5,-world_size*0.5, world_size*0.5]);
 px = Xr_gt(1,4,:);
 py = Xr_gt(2,4,:);
 pz = Xr_gt(3,4,:);
@@ -173,7 +181,6 @@ py = Xr(2,4,:);
 pz = Xr(3,4,:);
 scatter3(px,py,pz,'*','MarkerFaceColor',color_green);
 legend("GT", "Initialization");
-axis equal;
 hold off;
 
 

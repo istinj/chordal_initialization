@@ -110,15 +110,10 @@ for (iteration=1:num_iterations)
   % we solve the linear system, blocking the first pose
   % this corresponds to "remove" from H and b the locks
   % of the 1st pose, while solving the system
-%   dx(flat_rotation_dimension+1:end)=-(H(flat_rotation_dimension+1:end,flat_rotation_dimension+1:end)\b(flat_rotation_dimension+1:end,1));
+  dx(flat_rotation_dimension+1:end)=-(H(flat_rotation_dimension+1:end,flat_rotation_dimension+1:end)\b(flat_rotation_dimension+1:end,1));
 
-  dx=H\(-b);
+%   dx=H\(-b);
   XR=chordalBoxPlus(XR,num_poses, dx);
-  b_vec(iteration, :) = b';
-  dx_vec(iteration, :) = dx';
-
-  % b
-  % dx
 
 end
 

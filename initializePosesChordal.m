@@ -28,10 +28,6 @@ function [H,b]=initializePosesChordal(XR,Zr,associations,num_poses)
   b=zeros(system_size,1);
   for (measurement_num=1:size(Zr,3))
     Omega=eye(12);
-    Omega_i=Omega;
-    Omega_j=Omega;
-    Omega_ij=Omega;
-    % Omega(1:9,1:9)*=1e3; % we need to pimp the rotation  part a little
     pose_i_index=associations(1,measurement_num);
     pose_j_index=associations(2,measurement_num);
 
@@ -41,19 +37,7 @@ function [H,b]=initializePosesChordal(XR,Zr,associations,num_poses)
     Z=Zr(:,:,measurement_num);
     Xi=XR(:,:,pose_i_index);
     Xj=XR(:,:,pose_j_index);
-    [e,Ji,Jj] = chordalErrorAndJacobian(Xi, Xj, Z, pose_i_matrix_index, pose_j_matrix_index);
-
-%     Jii = zeros(12,12);
-    % if (1==pose_i_matrix_index)
-    %   Omega_i = Omega_i*1e10;
-    %   Jii = -eye(12,12);
-    % end
-
-%     Jjj = zeros(12,12);
-    % if (1==pose_j_matrix_index)
-    %   Omega_j = Omega_j*1e10;
-    %   Jjj = -eye(12,12);
-    % end
+    [e,Ji,Jj] = chordalErrorAndJacobian(Xi, Xj, Z);
 
 
     H(pose_i_matrix_index:pose_i_matrix_index+flat_rotation_dimension-1,...
@@ -81,8 +65,5 @@ function [H,b]=initializePosesChordal(XR,Zr,associations,num_poses)
     b(pose_j_matrix_index:pose_j_matrix_index+flat_rotation_dimension-1)=...
       b(pose_j_matrix_index:pose_j_matrix_index+flat_rotation_dimension-1)+Jj'*Omega_j*e;
 
-  end
-  %ia prior on first pose
-  H(1:12,1:12)=H(1:12,1:12)+ eye(12,12) * 1e6;
-    
+  end    
 end
