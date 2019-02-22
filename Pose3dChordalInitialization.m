@@ -38,7 +38,7 @@ end
 
 %ia generate pose measurements and data association
 num_meas = num_poses-1;
-factors = {};
+factors = {num_poses};
 for m=1:num_meas
   Xr_from = Xr_gt(:,:,m);
   Xr_to = Xr_gt(:,:,m+1);
@@ -56,7 +56,7 @@ end
 %ia generate a wrong initial guess
 Xr_guess = zeros(4,4,num_poses);
 Xr_guess(:,:,1) = Xr_gt(:,:,1); %ia fix the first pose
-pert_deviation=1;
+pert_deviation=10;
 pert_scale=eye(6)*pert_deviation;
 for p=2:num_poses
   if zero_guess
@@ -160,11 +160,11 @@ hold on; grid; axis([-world_size*0.5, world_size*0.5,-world_size*0.5, world_size
 px = Xr_gt(1,4,:);
 py = Xr_gt(2,4,:);
 pz = Xr_gt(3,4,:);
-scatter3(px,py,pz,'filled','MarkerFaceColor',color_cyan);
+scatter3(px,py,pz,30,'filled','MarkerFaceColor',color_cyan);
 px = Xr_guess(1,4,:);
 py = Xr_guess(2,4,:);
 pz = Xr_guess(3,4,:);
-scatter3(px,py,pz,'*','MarkerFaceColor',color_red);
+scatter3(px,py,pz,100,'o','MarkerEdgeColor',color_red);
 legend("GT", "Guess");
 hold off;
 
@@ -175,11 +175,11 @@ hold on; grid; axis([-world_size*0.5, world_size*0.5,-world_size*0.5, world_size
 px = Xr_gt(1,4,:);
 py = Xr_gt(2,4,:);
 pz = Xr_gt(3,4,:);
-scatter3(px,py,pz,'filled','MarkerFaceColor',color_cyan);
+scatter3(px,py,pz,30,'filled','MarkerFaceColor',color_cyan);
 px = Xr(1,4,:);
 py = Xr(2,4,:);
 pz = Xr(3,4,:);
-scatter3(px,py,pz,'*','MarkerFaceColor',color_green);
+scatter3(px,py,pz,100,'o','MarkerEdgeColor',color_red);
 legend("GT", "Initialization");
 hold off;
 

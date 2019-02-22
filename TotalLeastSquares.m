@@ -11,7 +11,7 @@ total_least_squares
 
 % synthesis of the virtual world
 num_landmarks=100;
-num_poses=10;
+num_poses=2;
 world_size=10;
 
 % landmarks in a matrix, one per column
@@ -176,17 +176,17 @@ legend("Landmark True", "Guess");grid;axis square
 
 subplot(2,2,3);
 title("Poses Initial Guess");
-plot3(XR_true(1,:),XR_true(2,:),XR_true(3,:),'b*',"linewidth",2);
+scatter3(XR_true(1,4,:),XR_true(2,4,:),XR_true(3,4,:),'b*',"linewidth",2);
 hold on;
-plot3(XR_guess(1,:),XR_guess(2,:),XR_guess(3,:),'ro',"linewidth",2);
+scatter3(XR_guess(1,4,:),XR_guess(2,4,:),XR_guess(3,4,:),'ro',"linewidth",2);
 legend("Poses True", "Guess");grid;axis square
 
 
 subplot(2,2,4);
 title("Poses After Optimization");
-plot3(XR_true(1,:),XR_true(2,:),XR_true(3,:),'b*',"linewidth",2);
+scatter3(XR_true(1,4,:),XR_true(2,4,:),XR_true(3,4,:),'b*',"linewidth",2);
 hold on;
-plot3(XR(1,:),XR(2,:),XR(3,:),'ro',"linewidth",2);
+scatter3(XR(1,4,:),XR(2,4,:),XR(3,4,:),'ro',"linewidth",2);
 legend("Poses True", "Guess"); grid;axis square
 
 
