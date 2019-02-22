@@ -14,16 +14,16 @@ function T=unflatten(v)
   T(1:3,4)=v(10:12);
 end;
 
-#computes the product matrix
-# such that A*B=mprod(flatten(b))*flatten(a)
-# this is your jacobian vinia!
+%computes the product matrix
+% such that A*B=mprod(flatten(b))*flatten(a)
+% this is your jacobian vinia!
 function M=mprod(v)
   M=eye(12);
   T=unflatten(v)
   R=T(1:3,1:3)
   t=T(1:3,4);
-  M(1:3,1:3)=M(4:6,4:6)=M(7:9,7:9)=R'; # R' on the diagonal blocks
-  M(10,1:3)=M(11,4:6)=M(12,7:9)=t';    # t' on the three rows of lower part
+  M(1:3,1:3)=M(4:6,4:6)=M(7:9,7:9)=R'; % R' on the diagonal blocks
+  M(10,1:3)=M(11,4:6)=M(12,7:9)=t';    % t' on the three rows of lower part
 end
 
 function doTest()

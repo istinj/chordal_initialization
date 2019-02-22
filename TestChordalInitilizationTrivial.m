@@ -2,7 +2,9 @@ close all;
 clear;
 clc;
 
-Factor = struct("id",-1,"pose",eye(12,12),"ass",[-1;-1],...
+chordal_dimension = 12;
+
+Factor = struct("id",-1,"pose",eye(chordal_dimension,chordal_dimension),"ass",[-1;-1],...
   "hii_idx_start",-1,"hii_idx_end",-1,...
   "hjj_idx_start",-1,"hjj_idx_end",-1);
 
@@ -18,7 +20,7 @@ color_red = [.9 .1 .1];
 color_green = [.1 .9 .1];
 
 %ia ground truth generation
-num_poses = 2;
+num_poses = 200;
 marker_size = 48;
 marker_size = repmat(marker_size, [1 1 num_poses]);
 world_size = 10;
@@ -47,9 +49,9 @@ for m=1:num_meas
   factors{m}.pose = inv(Xr_from)*Xr_to;
   factors{m}.ass = [m;m+1];
   factors{m}.hii_idx_start = chordalMatrixIndex(m, num_poses);
-  factors{m}.hii_idx_end = chordalMatrixIndex(m, num_poses)+12-1;
+  factors{m}.hii_idx_end = chordalMatrixIndex(m, num_poses)+chordal_dimension-1;
   factors{m}.hjj_idx_start = chordalMatrixIndex(m+1, num_poses);
-  factors{m}.hjj_idx_end = chordalMatrixIndex(m+1, num_poses)+12-1;
+  factors{m}.hjj_idx_end = chordalMatrixIndex(m+1, num_poses)+chordal_dimension-1;
 end
 
 %ia generate wrong initial guess (all zero);
@@ -61,43 +63,43 @@ end
 %ia start doing things
 Xr = Xr_guess;
 
-H = zeros(12*num_poses,12*num_poses);
-b = zeros(12*num_poses,1);
+H = zeros(chordal_dimension*num_poses,chordal_dimension*num_poses);
+b = zeros(chordal_dimension*num_poses,1);
 
-Omega = eye(12,12);
-Omega(1:9,1:9) = Omega(1:9,1:9)*1e9;
+Omega = eye(chordal_dimension,chordal_dimension);
+% Omega(1:9,1:9) = Omega(1:9,1:9)*1e9;
 % Omega(10:end,10:end) = zeros(3,3);
-Omega;
+% Omega;
 for z=1:num_meas
   factor = factors{z};
-  Ji = zeros(12,12);
-  Jj = zeros(12,12);
+  Ji = zeros(chordal_dimension,chordal_dimension);
+  Jj = zeros(chordal_dimension,chordal_dimension);
   Z = factor.pose;
   Xi = Xr(:,:,factor.ass(1));
   Xj = Xr(:,:,factor.ass(2));
   
   flat_xi = flattenIsometry(Xi);
   flat_xj = flattenIsometry(Xj);
-  Mij = mprod(Z); %ia creates a 12x12 matrix from the isometry
+  Mij = mprod(flattenIsometry(Z)); %ia creates a chordal_dimensionxchordal_dimension matrix from the isometry
   
   %ia error: Zij - hij(X) = Zij - inv(Xi)Xj = XiZij - Xj -> applying magic 
   %ia       -> Mij*flat(Xi) - flat(Xj)
-  %ia jacobians: Ji = Mij; Jj = -I(12x12);
+  %ia jacobians: Ji = Mij; Jj = -I(chordal_dimensionxchordal_dimension);
   error = Mij * flat_xi - flat_xj;
   Ji = Mij;
-  Jj = -1.0 * eye(12,12);
+  Jj = -1.0 * eye(chordal_dimension,chordal_dimension);
   
   %ia contruct least squares  
   %ia diagonal components
   H(factor.hii_idx_start:factor.hii_idx_end,factor.hii_idx_start:factor.hii_idx_end) = ...
     H(factor.hii_idx_start:factor.hii_idx_end,factor.hii_idx_start:factor.hii_idx_end)+Ji'*Omega*Ji;
   H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hjj_idx_start:factor.hjj_idx_end) = ...
-    H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hjj_idx_start:factor.hjj_idx_end)+Ji'*Omega*Ji;
+    H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hjj_idx_start:factor.hjj_idx_end)+Jj'*Omega*Jj;
   %ia mixed components
   H(factor.hii_idx_start:factor.hii_idx_end,factor.hjj_idx_start:factor.hjj_idx_end) = ...
     H(factor.hii_idx_start:factor.hii_idx_end,factor.hjj_idx_start:factor.hjj_idx_end)+Ji'*Omega*Jj;
   H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hii_idx_start:factor.hii_idx_end) = ...
-    H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hii_idx_start:factor.hii_idx_end)+Ji'*Omega*Jj;
+    H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hii_idx_start:factor.hii_idx_end)+Jj'*Omega*Ji;
   %ia rhs vector
   b(factor.hii_idx_start:factor.hii_idx_end,1) = ...
     b(factor.hii_idx_start:factor.hii_idx_end,1)+Ji'*Omega*error;
@@ -106,17 +108,24 @@ for z=1:num_meas
   
 end
 
-%ia compute solution of the system
-dx = zeros(12*num_poses,1);
-% dx = H\(-b); %ia simple solution
-dx(12+1:end)=-(H(12+1:end,12+1:end)\b(12+1:end,1));%ia discard first pose
+% H(1:chordal_dimension,1:chordal_dimension) = ...
+%   H(1:chordal_dimension,1:chordal_dimension)+eye(chordal_dimension, chordal_dimension);
+% 
+% b(1:chordal_dimension) = b(1:chordal_dimension)+flattenIsometry(Xr(:,:,1)-Xr_gt(:,:,1));
 
-dx
+%ia compute solution of the system
+dx = zeros(chordal_dimension*num_poses,1);
+% dx = H\(-b); %ia simple solution
+dx(chordal_dimension+1:end)=-(H(chordal_dimension+1:end,chordal_dimension+1:end)\b(chordal_dimension+1:end,1));%ia discard first pose
+
+% b
+% dx
+% rank(H)
 
 %ia apply increment
 for p=1:num_poses
   idx_start = chordalMatrixIndex(p,num_poses);
-  idx_end = idx_start+12-1;
+  idx_end = idx_start+chordal_dimension-1;
   increment = dx(idx_start:idx_end,1);
   
   %ia apply increment to translation
