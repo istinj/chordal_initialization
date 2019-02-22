@@ -18,10 +18,10 @@ function [e,Ji,Jj]=chordalErrorAndJacobian(Xi,Xj,Z,i_idx,j_idx)
 
   %ia if the pose is the first [aka the fixed one], we add a prior, saying that its
   %ia rotation matrix is the identity and it is located in the origin
-  if (0==i_idx)
-
-  end
-  if (0==j_idx)
-  end
+%   if (0==i_idx)
+% 
+%   end
+%   if (0==j_idx)
+%   end
 
  end

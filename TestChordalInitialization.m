@@ -19,14 +19,9 @@ world_size=10;
 % landmarks in a matrix, one per column
 P_world=(rand(landmark_dim, num_landmarks)-0.5)*world_size;
 
-global K; % camera matrix
-global image_rows;
-global image_cols;
-
 
 % poses in an array of 4x4 homogeneous transform matrices
 XR_true=zeros(4,4,num_poses);
-XL_true=P_world;
 
 % initialize 1st pose
 XR_true(:,:,1)=eye(4);
@@ -69,7 +64,6 @@ end
 pert_deviation=1;
 pert_scale=eye(6)*pert_deviation;
 XR_guess=XR_true;
-XL_guess=XL_true;
 
 for (pose_num=2:num_poses)
     xr=rand(6,1)-0.5;
@@ -116,9 +110,9 @@ for (iteration=1:num_iterations)
   % we solve the linear system, blocking the first pose
   % this corresponds to "remove" from H and b the locks
   % of the 1st pose, while solving the system
-  dx(flat_rotation_dimension+1:end)=-(H(flat_rotation_dimension+1:end,flat_rotation_dimension+1:end)\b(flat_rotation_dimension+1:end,1));
+%   dx(flat_rotation_dimension+1:end)=-(H(flat_rotation_dimension+1:end,flat_rotation_dimension+1:end)\b(flat_rotation_dimension+1:end,1));
 
-  % dx=H\(-b);
+  dx=H\(-b);
   XR=chordalBoxPlus(XR,num_poses, dx);
   b_vec(iteration, :) = b';
   dx_vec(iteration, :) = dx';
