@@ -11,6 +11,7 @@ global flat_rotation_dimension;flat_rotation_dimension = 12;
 color_cyan = [0 .75 .75];
 color_red = [.9 .1 .1];
 color_green = [.1 .9 .1];
+color_grey = [.1 .1 .1];
 
 %ia ground truth generation
 num_poses = 30;
@@ -81,7 +82,7 @@ end
 %ia generate a wrong initial guess
 Xr_guess = zeros(4,4,num_poses);
 Xr_guess(:,:,1) = Xr_gt(:,:,1); %ia fix the first pose
-pert_deviation=10;
+pert_deviation=world_size;
 pert_scale=eye(6)*pert_deviation;
 for p=2:num_poses
   if zero_guess
@@ -206,7 +207,7 @@ scatter3(px,py,pz,30,'filled','MarkerFaceColor',color_cyan);
 px = Xr(1,4,:);
 py = Xr(2,4,:);
 pz = Xr(3,4,:);
-scatter3(px,py,pz,100,'o','MarkerEdgeColor',color_red);
+scatter3(px,py,pz,100,'o','MarkerEdgeColor',color_grey);
 legend("GT", "Initialization");
 hold off;
 
