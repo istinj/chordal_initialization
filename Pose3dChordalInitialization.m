@@ -2,12 +2,34 @@ close all;
 clear;
 clc;
 
+global pose_dim;pose_dim=6;
+global Rx0;Rx0=[0 0 0;0 0 -1;0 1 0];
+global Ry0;Ry0=[0 0 1;0 0 0;-1 0 0];
+global Rz0;Rz0=[0 -1 0;1 0 0;0 0 0];
 global flat_rotation_dimension;flat_rotation_dimension = 12;
 
-chordal_dimension = 12;
-zero_guess = 0
+color_cyan = [0 .75 .75];
+color_red = [.9 .1 .1];
+color_green = [.1 .9 .1];
 
-Factor = struct("id",-1,"pose",eye(chordal_dimension,chordal_dimension),"ass",[-1;-1],...
+%ia ground truth generation
+num_poses = 30;
+world_size = 5;
+
+num_iterations = 1
+
+zero_guess = false
+meas_have_noise = false
+
+meas_noise_sigma_trans = 0.001;
+meas_noise_sigma_rot = 0.0001;
+
+meas_noise_sigma = eye(pose_dim,pose_dim);
+meas_noise_sigma(1:3,1:3) = meas_noise_sigma(1:3,1:3)*meas_noise_sigma_trans;
+meas_noise_sigma(4:end,4:end) = meas_noise_sigma(4:end,4:end)*meas_noise_sigma_rot;
+meas_noise_sigma
+
+Factor = struct("id",-1,"pose",eye(flat_rotation_dimension,flat_rotation_dimension),"ass",[-1;-1],...
   "hii_idx_start",-1,"hii_idx_end",-1,...
   "hjj_idx_start",-1,"hjj_idx_end",-1);
 
@@ -18,13 +40,6 @@ addpath("./tools/utilities");
 addpath("./tools/visualization");
 addpath("./tools/g2o_wrapper");
 
-color_cyan = [0 .75 .75];
-color_red = [.9 .1 .1];
-color_green = [.1 .9 .1];
-
-%ia ground truth generation
-num_poses = 200;
-world_size = 20;
 Xr_gt = zeros(4,4,num_poses);
 Xr_gt(:,:,1) = eye(4,4); %ia first pose is in the origin
 
@@ -50,9 +65,17 @@ for m=1:num_meas
   factors{m}.pose = inv(Xr_from)*Xr_to;
   factors{m}.ass = [m;m+1];
   factors{m}.hii_idx_start = chordalMatrixIndex(m, num_poses);
-  factors{m}.hii_idx_end = chordalMatrixIndex(m, num_poses)+chordal_dimension-1;
+  factors{m}.hii_idx_end = chordalMatrixIndex(m, num_poses)+flat_rotation_dimension-1;
   factors{m}.hjj_idx_start = chordalMatrixIndex(m+1, num_poses);
-  factors{m}.hjj_idx_end = chordalMatrixIndex(m+1, num_poses)+chordal_dimension-1;
+  factors{m}.hjj_idx_end = chordalMatrixIndex(m+1, num_poses)+flat_rotation_dimension-1;
+  
+  if meas_have_noise
+    R = chol(meas_noise_sigma);
+    dz_noise = (zeros(1,pose_dim) + randn(1,pose_dim)*R)';
+    disp('noise = ');
+    dz_noise'
+    factors{m}.pose = v2t(dz_noise)*factors{m}.pose;
+  end
 end
 
 %ia generate a wrong initial guess
@@ -67,91 +90,93 @@ for p=2:num_poses
   else
     %ia random guess
     xr=rand(6,1)-0.5;
-    Xr_guess(:,:,p) = v2t(pert_scale*xr)*Xr_gt(:,:,p);
+    dxr = pert_scale*xr;
+    Xr_guess(:,:,p) = v2t(dxr)*Xr_gt(:,:,p);
   end
 end
 
 %ia start doing things
 Xr = Xr_guess;
 
-H = zeros(chordal_dimension*num_poses,chordal_dimension*num_poses);
-b = zeros(chordal_dimension*num_poses,1);
-
-Omega = eye(chordal_dimension,chordal_dimension);
-% Omega(1:9,1:9) = Omega(1:9,1:9)*1e9;
-% Omega(10:end,10:end) = zeros(3,3);
-% Omega;
-for z=1:num_meas
-  factor = factors{z};
-  Ji = zeros(chordal_dimension,chordal_dimension);
-  Jj = zeros(chordal_dimension,chordal_dimension);
-  Z = factor.pose;
-  Xi = Xr(:,:,factor.ass(1));
-  Xj = Xr(:,:,factor.ass(2));
+for iteration=1:num_iterations
+  H = zeros(flat_rotation_dimension*num_poses,flat_rotation_dimension*num_poses);
+  b = zeros(flat_rotation_dimension*num_poses,1);
   
-  flat_xi = flattenByRow(Xi);
-  flat_xj = flattenByRow(Xj);
-  Mij = mprod(flattenByRow(Z)); %ia creates a chordal_dimensionxchordal_dimension matrix from the isometry
+  Omega = eye(flat_rotation_dimension,flat_rotation_dimension);
+  % Omega(1:9,1:9) = Omega(1:9,1:9)*1e9;
+  % Omega(10:end,10:end) = zeros(3,3);
+  % Omega;
+  for z=1:num_meas
+    factor = factors{z};
+    Ji = zeros(flat_rotation_dimension,flat_rotation_dimension);
+    Jj = zeros(flat_rotation_dimension,flat_rotation_dimension);
+    Z = factor.pose;
+    Xi = Xr(:,:,factor.ass(1));
+    Xj = Xr(:,:,factor.ass(2));
+    
+    flat_xi = flattenByRow(Xi);
+    flat_xj = flattenByRow(Xj);
+    Mij = mprod(flattenByRow(Z)); %ia creates a flat_rotation_dimensionxflat_rotation_dimension matrix from the isometry
+    
+    %ia error: Zij - hij(X) = Zij - inv(Xi)Xj = XiZij - Xj -> applying magic
+    %ia       -> Mij*flat(Xi) - flat(Xj)
+    %ia jacobians: Ji = Mij; Jj = -I(flat_rotation_dimensionxflat_rotation_dimension);
+    error = Mij * flat_xi - flat_xj;
+%     error = zeros(12,1);
+    Ji = Mij;
+    Jj = -1.0 * eye(flat_rotation_dimension,flat_rotation_dimension);
+    
+    %ia contruct least squares
+    %ia diagonal components
+    H(factor.hii_idx_start:factor.hii_idx_end,factor.hii_idx_start:factor.hii_idx_end) = ...
+      H(factor.hii_idx_start:factor.hii_idx_end,factor.hii_idx_start:factor.hii_idx_end)+Ji'*Omega*Ji;
+    H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hjj_idx_start:factor.hjj_idx_end) = ...
+      H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hjj_idx_start:factor.hjj_idx_end)+Jj'*Omega*Jj;
+    %ia mixed components
+    H(factor.hii_idx_start:factor.hii_idx_end,factor.hjj_idx_start:factor.hjj_idx_end) = ...
+      H(factor.hii_idx_start:factor.hii_idx_end,factor.hjj_idx_start:factor.hjj_idx_end)+Ji'*Omega*Jj;
+    H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hii_idx_start:factor.hii_idx_end) = ...
+      H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hii_idx_start:factor.hii_idx_end)+Jj'*Omega*Ji;
+    %ia rhs vector
+    b(factor.hii_idx_start:factor.hii_idx_end,1) = ...
+      b(factor.hii_idx_start:factor.hii_idx_end,1)+Ji'*Omega*error;
+    b(factor.hjj_idx_start:factor.hjj_idx_end,1) = ...
+      b(factor.hjj_idx_start:factor.hjj_idx_end,1)+Jj'*Omega*error;
+    
+  end
   
-  %ia error: Zij - hij(X) = Zij - inv(Xi)Xj = XiZij - Xj -> applying magic
-  %ia       -> Mij*flat(Xi) - flat(Xj)
-  %ia jacobians: Ji = Mij; Jj = -I(chordal_dimensionxchordal_dimension);
-  error = Mij * flat_xi - flat_xj;
-  Ji = Mij;
-  Jj = -1.0 * eye(chordal_dimension,chordal_dimension);
+%   H(1:flat_rotation_dimension,1:flat_rotation_dimension) = ...
+%     H(1:flat_rotation_dimension,1:flat_rotation_dimension)+eye(flat_rotation_dimension, flat_rotation_dimension);
+%   
+%   b(1:flat_rotation_dimension) = b(1:flat_rotation_dimension)+flattenByRow(Xr(:,:,1)-Xr_gt(:,:,1));
   
-  %ia contruct least squares
-  %ia diagonal components
-  H(factor.hii_idx_start:factor.hii_idx_end,factor.hii_idx_start:factor.hii_idx_end) = ...
-    H(factor.hii_idx_start:factor.hii_idx_end,factor.hii_idx_start:factor.hii_idx_end)+Ji'*Omega*Ji;
-  H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hjj_idx_start:factor.hjj_idx_end) = ...
-    H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hjj_idx_start:factor.hjj_idx_end)+Jj'*Omega*Jj;
-  %ia mixed components
-  H(factor.hii_idx_start:factor.hii_idx_end,factor.hjj_idx_start:factor.hjj_idx_end) = ...
-    H(factor.hii_idx_start:factor.hii_idx_end,factor.hjj_idx_start:factor.hjj_idx_end)+Ji'*Omega*Jj;
-  H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hii_idx_start:factor.hii_idx_end) = ...
-    H(factor.hjj_idx_start:factor.hjj_idx_end,factor.hii_idx_start:factor.hii_idx_end)+Jj'*Omega*Ji;
-  %ia rhs vector
-  b(factor.hii_idx_start:factor.hii_idx_end,1) = ...
-    b(factor.hii_idx_start:factor.hii_idx_end,1)+Ji'*Omega*error;
-  b(factor.hjj_idx_start:factor.hjj_idx_end,1) = ...
-    b(factor.hjj_idx_start:factor.hjj_idx_end,1)+Jj'*Omega*error;
+  %ia compute solution of the system
+  dx = zeros(flat_rotation_dimension*num_poses,1);
+%   dx = H\(-b); %ia simple solution
+  dx(flat_rotation_dimension+1:end)=-(H(flat_rotation_dimension+1:end,flat_rotation_dimension+1:end)\b(flat_rotation_dimension+1:end,1));%ia discard first pose
   
+  b
+  dx
+  rank(H)
+  
+  %ia apply increment
+  for p=1:num_poses
+    idx_start = chordalMatrixIndex(p,num_poses);
+    idx_end = idx_start+flat_rotation_dimension-1;
+    increment = dx(idx_start:idx_end,1);
+    
+    xr = flattenByRow(Xr(:,:,p));
+    xr = xr+increment;
+    Xr(:,:,p) = unflattenByRow(xr);
+    
+    %ia re-enforce the rotation constraint
+    [U,S,V] = svd(Xr(1:3,1:3));
+    R_enforced = U*V';
+    Xr(1:3,1:3) = R_enforced;
+  end
+  
+%   pause;
 end
-
-% H(1:chordal_dimension,1:chordal_dimension) = ...
-%   H(1:chordal_dimension,1:chordal_dimension)+eye(chordal_dimension, chordal_dimension);
-%
-% b(1:chordal_dimension) = b(1:chordal_dimension)+flattenIsometry(Xr(:,:,1)-Xr_gt(:,:,1));
-
-%ia compute solution of the system
-dx = zeros(chordal_dimension*num_poses,1);
-% dx = H\(-b); %ia simple solution
-dx(chordal_dimension+1:end)=-(H(chordal_dimension+1:end,chordal_dimension+1:end)\b(chordal_dimension+1:end,1));%ia discard first pose
-
-% b
-% dx
-% rank(H)
-
-%ia apply increment
-for p=1:num_poses
-  idx_start = chordalMatrixIndex(p,num_poses);
-  idx_end = idx_start+chordal_dimension-1;
-  increment = dx(idx_start:idx_end,1);
-  
-  %ia apply increment to translation
-  Xr(1:3,4,p) = Xr(1:3,4,p) + increment(10:end);
-  
-  %ia apply increment to rotation
-  Xr(1:3,1,p) = Xr(1:3,1,p) + increment(1:3);
-  Xr(1:3,2,p) = Xr(1:3,2,p) + increment(4:6);
-  Xr(1:3,3,p) = Xr(1:3,3,p) + increment(7:9);
-  %ia re-enforce the rotation constraint
-  [U,S,V] = svd(Xr(1:3,1:3));
-  R_enforced = U*V';
-  Xr(1:3,1:3) = R_enforced;
-end
-
 
 %% Show things
 %ia show the created world
