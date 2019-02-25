@@ -2,6 +2,8 @@ close all;
 clear;
 clc;
 
+global flat_rotation_dimension;flat_rotation_dimension = 12;
+
 chordal_dimension = 12;
 zero_guess = 0
 
@@ -22,7 +24,7 @@ color_green = [.1 .9 .1];
 
 %ia ground truth generation
 num_poses = 200;
-world_size = 50;
+world_size = 20;
 Xr_gt = zeros(4,4,num_poses);
 Xr_gt(:,:,1) = eye(4,4); %ia first pose is in the origin
 
@@ -31,9 +33,9 @@ rand_scale=eye(6);
 rand_scale(1:3,1:3) = rand_scale(1:3,1:3) * (0.5*world_size);
 rand_scale(4:6,4:6) = rand_scale(4:6,4:6)*pi;
 for p=2:num_poses
-    xr=rand(6,1)-0.5;
-    Xr=v2t(rand_scale*xr);
-    Xr_gt(:,:,p)=Xr;
+  xr=rand(6,1)-0.5;
+  Xr=v2t(rand_scale*xr);
+  Xr_gt(:,:,p)=Xr;
 end
 
 %ia generate pose measurements and data association
@@ -65,7 +67,7 @@ for p=2:num_poses
   else
     %ia random guess
     xr=rand(6,1)-0.5;
-    Xr_guess(:,:,p) = v2t(pert_scale*xr)*Xr_gt(:,:,p); 
+    Xr_guess(:,:,p) = v2t(pert_scale*xr)*Xr_gt(:,:,p);
   end
 end
 
@@ -87,18 +89,18 @@ for z=1:num_meas
   Xi = Xr(:,:,factor.ass(1));
   Xj = Xr(:,:,factor.ass(2));
   
-  flat_xi = flattenIsometry(Xi);
-  flat_xj = flattenIsometry(Xj);
-  Mij = mprod(flattenIsometry(Z)); %ia creates a chordal_dimensionxchordal_dimension matrix from the isometry
+  flat_xi = flattenByRow(Xi);
+  flat_xj = flattenByRow(Xj);
+  Mij = mprod(flattenByRow(Z)); %ia creates a chordal_dimensionxchordal_dimension matrix from the isometry
   
-  %ia error: Zij - hij(X) = Zij - inv(Xi)Xj = XiZij - Xj -> applying magic 
+  %ia error: Zij - hij(X) = Zij - inv(Xi)Xj = XiZij - Xj -> applying magic
   %ia       -> Mij*flat(Xi) - flat(Xj)
   %ia jacobians: Ji = Mij; Jj = -I(chordal_dimensionxchordal_dimension);
   error = Mij * flat_xi - flat_xj;
   Ji = Mij;
   Jj = -1.0 * eye(chordal_dimension,chordal_dimension);
   
-  %ia contruct least squares  
+  %ia contruct least squares
   %ia diagonal components
   H(factor.hii_idx_start:factor.hii_idx_end,factor.hii_idx_start:factor.hii_idx_end) = ...
     H(factor.hii_idx_start:factor.hii_idx_end,factor.hii_idx_start:factor.hii_idx_end)+Ji'*Omega*Ji;
@@ -119,7 +121,7 @@ end
 
 % H(1:chordal_dimension,1:chordal_dimension) = ...
 %   H(1:chordal_dimension,1:chordal_dimension)+eye(chordal_dimension, chordal_dimension);
-% 
+%
 % b(1:chordal_dimension) = b(1:chordal_dimension)+flattenIsometry(Xr(:,:,1)-Xr_gt(:,:,1));
 
 %ia compute solution of the system
