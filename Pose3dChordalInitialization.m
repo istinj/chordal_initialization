@@ -20,16 +20,17 @@ color_green = [.1 .9 .1];
 color_grey = [.1 .1 .1];
 
 %ia ground truth generation
-num_poses = 200;
-world_size = 50;
+num_poses = 20;
+world_size = 5;
 
 num_iterations = 1
 
 zero_guess = false
 meas_have_noise = true
+use_sparse_matrix = false
 
-meas_noise_sigma_trans = 0.001;
-meas_noise_sigma_rot = 0.0005;
+meas_noise_sigma_trans = 1.0;
+meas_noise_sigma_rot = 0.2;
 
 meas_noise_sigma = eye(pose_dim,pose_dim);
 meas_noise_sigma(1:3,1:3) = meas_noise_sigma(1:3,1:3)*meas_noise_sigma_trans;
@@ -39,6 +40,11 @@ meas_noise_sigma
 Factor = struct("id",-1,"pose",eye(flat_rotation_dimension,flat_rotation_dimension),"ass",[-1;-1],...
   "hii_idx_start",-1,"hii_idx_end",-1,...
   "hjj_idx_start",-1,"hjj_idx_end",-1);
+
+if num_poses>500
+  disp("too much poses, overriding use_sparse_matrix")
+  use_sparse_matrix = true
+end
 
 %% Data generation
 
@@ -103,7 +109,11 @@ end
 Xr = Xr_guess;
 
 for iteration=1:num_iterations
-  H = zeros(flat_rotation_dimension*num_poses,flat_rotation_dimension*num_poses);
+  if use_sparse_matrix
+    H = sparse(flat_rotation_dimension*num_poses,flat_rotation_dimension*num_poses);
+  else
+    H = zeros(flat_rotation_dimension*num_poses,flat_rotation_dimension*num_poses);
+  end
   b = zeros(flat_rotation_dimension*num_poses,1);
   
   Omega = eye(flat_rotation_dimension,flat_rotation_dimension);
@@ -168,7 +178,7 @@ for iteration=1:num_iterations
   
   b;
   dx;
-  rank(H);
+%   rank(H);
   
   %ia apply increment
   for p=1:num_poses
@@ -185,13 +195,18 @@ for iteration=1:num_iterations
 end
 
 
-%% Solve Full Pose [with Chordal?]
+%% Solve Full Pose [Chordal factors or Geodesic ones?]
 chi_vector = zeros(num_iterations,1);
 for iteration=1:num_iterations
-  H = zeros(pose_dim*num_poses,pose_dim*num_poses);
+  if use_sparse_matrix
+    H = sparse(pose_dim*num_poses,pose_dim*num_poses);
+  else
+    H = zeros(pose_dim*num_poses,pose_dim*num_poses);
+  end
   b = zeros(pose_dim*num_poses,1);
   dx = zeros(pose_dim*num_poses,1);
   Omega = eye(12,12);
+  Omega(1:9,1:9) = Omega(1:9,1:9)*100;
   
   kernel_threshold = 1e10;
   num_inliers = 0;
@@ -242,7 +257,7 @@ for iteration=1:num_iterations
     
   end
   
-  rank(H);
+%   rank(H);
   
   %   dx = H\(-b); %ia simple
   dx(pose_dim+1:end,1) = H(pose_dim+1:end,pose_dim+1:end)\(-b(pose_dim+1:end,1)); %ia discard first pose
