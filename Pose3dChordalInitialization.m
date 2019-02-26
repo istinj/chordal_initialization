@@ -2,11 +2,17 @@ close all;
 clear;
 clc;
 
+%ia add things
+addpath("./tools");
+addpath("./tools/utilities");
+addpath("./tools/visualization");
+addpath("./tools/g2o_wrapper");
+
 global pose_dim;pose_dim=6;
 global Rx0;Rx0=[0 0 0;0 0 -1;0 1 0];
 global Ry0;Ry0=[0 0 1;0 0 0;-1 0 0];
 global Rz0;Rz0=[0 -1 0;1 0 0;0 0 0];
-global flat_rotation_dimension;flat_rotation_dimension = 12;
+global flat_rotation_dimension;flat_rotation_dimension = 9;
 
 color_cyan = [0 .75 .75];
 color_red = [.9 .1 .1];
@@ -14,16 +20,16 @@ color_green = [.1 .9 .1];
 color_grey = [.1 .1 .1];
 
 %ia ground truth generation
-num_poses = 30;
-world_size = 5;
+num_poses = 200;
+world_size = 50;
 
 num_iterations = 1
 
-zero_guess = false
-meas_have_noise = false
+zero_guess = true
+meas_have_noise = true
 
-meas_noise_sigma_trans = 0.001;
-meas_noise_sigma_rot = 0.0001;
+meas_noise_sigma_trans = 1.0;
+meas_noise_sigma_rot = 0.1;
 
 meas_noise_sigma = eye(pose_dim,pose_dim);
 meas_noise_sigma(1:3,1:3) = meas_noise_sigma(1:3,1:3)*meas_noise_sigma_trans;
@@ -34,12 +40,7 @@ Factor = struct("id",-1,"pose",eye(flat_rotation_dimension,flat_rotation_dimensi
   "hii_idx_start",-1,"hii_idx_end",-1,...
   "hjj_idx_start",-1,"hjj_idx_end",-1);
 
-%% Compute things
-%ia add things
-addpath("./tools");
-addpath("./tools/utilities");
-addpath("./tools/visualization");
-addpath("./tools/g2o_wrapper");
+%% Data generation
 
 Xr_gt = zeros(4,4,num_poses);
 Xr_gt(:,:,1) = eye(4,4); %ia first pose is in the origin
@@ -96,6 +97,8 @@ for p=2:num_poses
   end
 end
 
+
+%% Solve Rotations [positions are fixed]
 %ia start doing things
 Xr = Xr_guess;
 
@@ -117,14 +120,21 @@ for iteration=1:num_iterations
     
     flat_xi = flattenByRow(Xi);
     flat_xj = flattenByRow(Xj);
-    Mij = mprod(flattenByRow(Z)); %ia creates a flat_rotation_dimensionxflat_rotation_dimension matrix from the isometry
+    
+    flat_xi = flat_xi(1:9);
+    flat_xj = flat_xj(1:9);
+    
+    M = zeros(9,9);
+    M(1:3,1:3) = Z(1:3,1:3)';
+    M(4:6,4:6) = Z(1:3,1:3)';
+    M(7:9,7:9) = Z(1:3,1:3)';
     
     %ia error: Zij - hij(X) = Zij - inv(Xi)Xj = XiZij - Xj -> applying magic
     %ia       -> Mij*flat(Xi) - flat(Xj)
-    %ia jacobians: Ji = Mij; Jj = -I(flat_rotation_dimensionxflat_rotation_dimension);
-    error = Mij * flat_xi - flat_xj;
-%     error = zeros(12,1);
-    Ji = Mij;
+    %ia jacobians: Ji = Mij; Jj = -I(flat_rotation_dimension x flat_rotation_dimension);
+    error = zeros(9,1);
+    error = M * flat_xi - flat_xj;
+    Ji = M;
     Jj = -1.0 * eye(flat_rotation_dimension,flat_rotation_dimension);
     
     %ia contruct least squares
@@ -146,18 +156,18 @@ for iteration=1:num_iterations
     
   end
   
-%   H(1:flat_rotation_dimension,1:flat_rotation_dimension) = ...
-%     H(1:flat_rotation_dimension,1:flat_rotation_dimension)+eye(flat_rotation_dimension, flat_rotation_dimension);
-%   
-%   b(1:flat_rotation_dimension) = b(1:flat_rotation_dimension)+flattenByRow(Xr(:,:,1)-Xr_gt(:,:,1));
+  %   H(1:flat_rotation_dimension,1:flat_rotation_dimension) = ...
+  %     H(1:flat_rotation_dimension,1:flat_rotation_dimension)+eye(flat_rotation_dimension, flat_rotation_dimension);
+  %
+  %   b(1:flat_rotation_dimension) = b(1:flat_rotation_dimension)+flattenByRow(Xr(:,:,1)-Xr_gt(:,:,1));
   
   %ia compute solution of the system
   dx = zeros(flat_rotation_dimension*num_poses,1);
-%   dx = H\(-b); %ia simple solution
+  %   dx = H\(-b); %ia simple solution
   dx(flat_rotation_dimension+1:end)=-(H(flat_rotation_dimension+1:end,flat_rotation_dimension+1:end)\b(flat_rotation_dimension+1:end,1));%ia discard first pose
   
-  b
-  dx
+  b;
+  dx;
   rank(H)
   
   %ia apply increment
@@ -167,16 +177,81 @@ for iteration=1:num_iterations
     increment = dx(idx_start:idx_end,1);
     
     xr = flattenByRow(Xr(:,:,p));
-    xr = xr+increment;
-    Xr(:,:,p) = unflattenByRow(xr);
-    
-    %ia re-enforce the rotation constraint
-    [U,S,V] = svd(Xr(1:3,1:3));
-    R_enforced = U*V';
-    Xr(1:3,1:3) = R_enforced;
+    xr(1:flat_rotation_dimension,1) = xr(1:flat_rotation_dimension,1)+increment;
+    Xr(:,:,p) = unflattenByRow(xr, true); %ia second argument re-enforces orthogonality constraint
   end
   
-%   pause;
+  %   pause;
+end
+
+
+%% Solve Full Pose [with Chordal?]
+for iteration=1:num_iterations
+  H = zeros(pose_dim*num_poses,pose_dim*num_poses);
+  b = zeros(pose_dim*num_poses,1);
+  dx = zeros(pose_dim*num_poses,1);
+  Omega = eye(12,12);
+  
+  chi_tot = 0;
+  kernel_threshold = 1e10;
+  num_inliers = 0;
+  for z=1:num_meas
+    factor = factors{z};
+    Z = factor.pose;
+    Xi = Xr(:,:,factor.ass(1));
+    Xj = Xr(:,:,factor.ass(2));
+    
+    [e,Ji,Jj]=poseErrorAndJacobian(Xi,Xj,Z);
+    chi=e'*Omega*e;
+    if (chi>kernel_threshold)
+      Omega=Omega*sqrt(kernel_threshold/chi);
+      chi=kernel_threshold;
+    else
+      num_inliers=num_inliers+1;
+    end
+    chi_tot=chi_tot+chi;
+    
+    pose_i_matrix_index=poseMatrixIndex(factor.ass(1), num_poses, 0);
+    pose_j_matrix_index=poseMatrixIndex(factor.ass(2), num_poses, 0);
+    
+    H(pose_i_matrix_index:pose_i_matrix_index+pose_dim-1,...
+      pose_i_matrix_index:pose_i_matrix_index+pose_dim-1)=...
+      H(pose_i_matrix_index:pose_i_matrix_index+pose_dim-1,...
+      pose_i_matrix_index:pose_i_matrix_index+pose_dim-1)+Ji'*Omega*Ji;
+    
+    H(pose_i_matrix_index:pose_i_matrix_index+pose_dim-1,...
+      pose_j_matrix_index:pose_j_matrix_index+pose_dim-1)=...
+      H(pose_i_matrix_index:pose_i_matrix_index+pose_dim-1,...
+      pose_j_matrix_index:pose_j_matrix_index+pose_dim-1)+Ji'*Omega*Jj;
+    
+    H(pose_j_matrix_index:pose_j_matrix_index+pose_dim-1,...
+      pose_i_matrix_index:pose_i_matrix_index+pose_dim-1)=...
+      H(pose_j_matrix_index:pose_j_matrix_index+pose_dim-1,...
+      pose_i_matrix_index:pose_i_matrix_index+pose_dim-1)+Jj'*Omega*Ji;
+    
+    H(pose_j_matrix_index:pose_j_matrix_index+pose_dim-1,...
+      pose_j_matrix_index:pose_j_matrix_index+pose_dim-1)=...
+      H(pose_j_matrix_index:pose_j_matrix_index+pose_dim-1,...
+      pose_j_matrix_index:pose_j_matrix_index+pose_dim-1)+Jj'*Omega*Jj;
+    
+    b(pose_i_matrix_index:pose_i_matrix_index+pose_dim-1)=...
+      b(pose_i_matrix_index:pose_i_matrix_index+pose_dim-1)+Ji'*Omega*e;
+    b(pose_j_matrix_index:pose_j_matrix_index+pose_dim-1)=...
+      b(pose_j_matrix_index:pose_j_matrix_index+pose_dim-1)+Jj'*Omega*e;
+    
+  end
+  
+  rank(H)
+  
+  %   dx = H\(-b); %ia simple
+  dx(pose_dim+1:end,1) = H(pose_dim+1:end,pose_dim+1:end)\(-b(pose_dim+1:end,1)); %ia discard first pose
+  
+  for(p=1:num_poses)
+    pose_matrix_index=poseMatrixIndex(p, num_poses, 0);
+    dxr=dx(pose_matrix_index:pose_matrix_index+pose_dim-1);
+    Xr(:,:,p)=v2t(dxr)*Xr(:,:,p);
+  end
+  
 end
 
 %% Show things
