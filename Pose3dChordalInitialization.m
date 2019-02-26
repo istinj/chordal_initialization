@@ -25,11 +25,11 @@ world_size = 50;
 
 num_iterations = 1
 
-zero_guess = true
+zero_guess = false
 meas_have_noise = true
 
-meas_noise_sigma_trans = 1.0;
-meas_noise_sigma_rot = 0.1;
+meas_noise_sigma_trans = 0.001;
+meas_noise_sigma_rot = 0.0005;
 
 meas_noise_sigma = eye(pose_dim,pose_dim);
 meas_noise_sigma(1:3,1:3) = meas_noise_sigma(1:3,1:3)*meas_noise_sigma_trans;
@@ -74,8 +74,8 @@ for m=1:num_meas
   if meas_have_noise
     R = chol(meas_noise_sigma);
     dz_noise = (zeros(1,pose_dim) + randn(1,pose_dim)*R)';
-    disp('noise = ');
-    dz_noise'
+%     disp('noise = ');
+%     dz_noise'
     factors{m}.pose = v2t(dz_noise)*factors{m}.pose;
   end
 end
@@ -168,7 +168,7 @@ for iteration=1:num_iterations
   
   b;
   dx;
-  rank(H)
+  rank(H);
   
   %ia apply increment
   for p=1:num_poses
@@ -186,13 +186,13 @@ end
 
 
 %% Solve Full Pose [with Chordal?]
+chi_vector = zeros(num_iterations,1);
 for iteration=1:num_iterations
   H = zeros(pose_dim*num_poses,pose_dim*num_poses);
   b = zeros(pose_dim*num_poses,1);
   dx = zeros(pose_dim*num_poses,1);
   Omega = eye(12,12);
   
-  chi_tot = 0;
   kernel_threshold = 1e10;
   num_inliers = 0;
   for z=1:num_meas
@@ -209,7 +209,8 @@ for iteration=1:num_iterations
     else
       num_inliers=num_inliers+1;
     end
-    chi_tot=chi_tot+chi;
+
+    chi_vector(iteration,1)=chi_vector(iteration,1)+chi;
     
     pose_i_matrix_index=poseMatrixIndex(factor.ass(1), num_poses, 0);
     pose_j_matrix_index=poseMatrixIndex(factor.ass(2), num_poses, 0);
@@ -241,12 +242,12 @@ for iteration=1:num_iterations
     
   end
   
-  rank(H)
+  rank(H);
   
   %   dx = H\(-b); %ia simple
   dx(pose_dim+1:end,1) = H(pose_dim+1:end,pose_dim+1:end)\(-b(pose_dim+1:end,1)); %ia discard first pose
   
-  for(p=1:num_poses)
+  for p=1:num_poses
     pose_matrix_index=poseMatrixIndex(p, num_poses, 0);
     dxr=dx(pose_matrix_index:pose_matrix_index+pose_dim-1);
     Xr(:,:,p)=v2t(dxr)*Xr(:,:,p);
@@ -285,6 +286,11 @@ pz = Xr(3,4,:);
 scatter3(px,py,pz,100,'o','MarkerEdgeColor',color_grey);
 legend("GT", "Initialization");
 hold off;
+
+% figure("Name","full pose chi2 evolution")
+% it = 1:1:num_iterations;
+% it = it';
+% plot(it,chi_vector)
 
 
 
